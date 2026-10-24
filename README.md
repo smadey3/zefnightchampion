@@ -115,7 +115,11 @@ buttons are showing.
   stay as they were counted), so its meter never jumps.
 
 A morning with no record is unknown. It never counts as dry or not dry: it
-doesn't add a star and doesn't change the meter.
+doesn't add a star and doesn't change the meter, except in the last five
+dots. Those need five nights in a row, so when a morning in between wasn't
+recorded, the next dry morning starts the last five over (Coach Rex says
+why, gently). The grown-up corner points out a missing morning, and filling
+it in afterwards puts the dots back.
 
 ## A new child
 
@@ -155,6 +159,8 @@ multiplication question. In the parent corner you can:
   which can be turned off) or start it over (the classic way: dry nights in
   a row). An adventure already under way when the last-five rule arrived
   gets it from its next morning on, so nothing already recorded changes
+- see missing mornings and fill them in; in the last five dots it says
+  that a missing morning would start them over, or did, and how to undo it
 - edit the prizes and tick off the ones you've handed over
 - preview a dry morning, the hug, a prize chest, a surprise (a different
   one each tap), the Underwear Store or the intro, without changing real

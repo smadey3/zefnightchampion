@@ -11,7 +11,9 @@
 //   dots, which need dry mornings in a row: a wet morning there starts those
 //   five over. In the classic mode a wet morning starts the whole meter over,
 //   so it counts dry mornings in a row. A morning with no record is unknown:
-//   it neither adds nor takes away.
+//   it neither adds nor takes away, except in those last five dots, where a
+//   gap means the nights weren't in a row, so the next dry morning starts
+//   them over (filling the gap in later puts the dots back).
 // - Prizes come from total stars: an early one at `earlyPrize` stars, then at
 //   `firstPrize` stars, then one every `prizeEvery` stars after that (5, 10,
 //   25, 40, ... by default).
@@ -39,7 +41,7 @@ export interface QuestRules {
    * switching never makes the meter jump. Null: kinder from the start.
    */
   kindFrom: DateKey | null;
-  /** Kinder meter: the last this-many dots need dry nights in a row (a wet night there starts them over); 0 = off. */
+  /** Kinder meter: the last this-many dots need dry nights in a row (a wet night or a skipped morning there starts them over); 0 = off. */
   finalRun: number;
   /** The first morning the last-dots rule applies, for an adventure that began before it existed (null: from the start). */
   finalFrom: DateKey | null;
@@ -187,6 +189,11 @@ export interface QuestState {
   lastWet: DateKey | null;
   /** First morning the meter reached the goal, if it ever has. */
   goalReachedOn: DateKey | null;
+  /**
+   * The latest dry morning that started the last dots over because the morning
+   * before it wasn't recorded (`after` is the morning recorded before the gap).
+   */
+  missedRestart: { on: DateKey; after: DateKey } | null;
   prizes: number;
   nextPrizeAt: number;
 }
@@ -200,9 +207,19 @@ export function computeQuest(records: Records, rules: QuestRules = DEFAULT_RULES
   const { size: stretch, floor } = finalStretch(rules);
   let lastWet: DateKey | null = null;
   let goalReachedOn: DateKey | null = null;
+  let missedRestart: QuestState['missedRestart'] = null;
+  let prev: DateKey | null = null;
   const keys = sortedKeys(records);
   for (const k of keys) {
+    const kind = rules.meter === 'kind' && (!rules.kindFrom || k >= rules.kindFrom);
+    const inStretch = kind && stretch > 0 && meter > floor && (!rules.finalFrom || k >= rules.finalFrom);
     if (records[k] === 'dry') {
+      // the last stretch needs nights in a row, so a morning nobody recorded
+      // (since the rule began) starts it over too
+      if (inStretch && prev && daysBetween(prev, k) > 1 && (!rules.finalFrom || k > rules.finalFrom)) {
+        meter = floor;
+        missedRestart = { on: k, after: prev };
+      }
       stars++;
       run++;
       meter++;
@@ -211,12 +228,11 @@ export function computeQuest(records: Records, rules: QuestRules = DEFAULT_RULES
     } else {
       wets++;
       run = 0;
-      const kind = rules.meter === 'kind' && (!rules.kindFrom || k >= rules.kindFrom);
       // in the last stretch a wet morning starts the stretch over
-      const restart = kind && stretch > 0 && meter > floor && (!rules.finalFrom || k >= rules.finalFrom);
-      meter = !kind ? 0 : restart ? floor : Math.max(0, meter - 1);
+      meter = !kind ? 0 : inStretch ? floor : Math.max(0, meter - 1);
       lastWet = k;
     }
+    prev = k;
   }
   const last = keys[keys.length - 1];
   const prizes = prizesEarned(stars, rules);
@@ -228,6 +244,7 @@ export function computeQuest(records: Records, rules: QuestRules = DEFAULT_RULES
     latest: last ? { date: last, result: records[last] } : null,
     lastWet,
     goalReachedOn,
+    missedRestart,
     prizes,
     nextPrizeAt: prizeThreshold(prizes, rules),
   };

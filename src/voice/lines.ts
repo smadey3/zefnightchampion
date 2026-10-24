@@ -195,6 +195,9 @@ export const LINES: Record<string, Line> = {
   'meter-2': { text: 'Just two more dry nights to go!' },
   'meter-1': { text: 'Just one more dry night! You can do it!' },
   'meter-final': { text: 'Whoa! You made it to the last five dots! Stay dry five nights in a row, and your meter is all the way full!' },
+  // a morning nobody recorded: the dots that need nights in a row start over
+  'meter-missed': { text: 'Oh! We missed a morning, so the last five dots start over. But you stayed dry last night, so here comes the first one!' },
+  'meter-missed-all': { text: 'Oh! We missed a morning, so your meter starts over. But you stayed dry last night!' },
 
   // ---------------------------------------------------------- chests
   'chest-reach': { text: "You made it to the treasure chest! Tap it and see what's inside!" },

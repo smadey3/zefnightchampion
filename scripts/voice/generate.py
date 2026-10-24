@@ -44,7 +44,7 @@ SPEAKER = 'ryan'
 STYLE = ("Speak like a fun, high-energy children's TV host: bright and warm, smiling while talking, "
          "with lively pitch swings and a quick, bouncy pace. Natural and human, never like an announcer.")
 MOODS = [
-    (r'^wet-', 'Gentle, warm and reassuring, still upbeat and smiling.'),
+    (r'^(wet-|meter-missed)', 'Gentle, warm and reassuring, still upbeat and smiling.'),
     (r'^(ask|ask-short|already)$', 'Curious and warm, asking a little kid a question.'),
     (r'^intro-(3|4|prizes|meter|meter-kind)$', 'Clear and upbeat, explaining a fun game to a little kid.'),
     (r'^peekaboo', 'Playful and giggly, playing hide and seek with a little kid.'),

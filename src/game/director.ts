@@ -615,6 +615,10 @@ async function playPending(ctx: Ctx) {
 
   // 2. the meter catches up (dry) — a wet night's dot comes off during the hug
   const after = quest();
+  const { floor } = finalStretch(data().rules);
+  if (latestDry && after.missedRestart?.on === after.latest?.date && useGame.getState().shownMeter > floor) {
+    await lastDotsOver(ctx, floor);
+  }
   if (latestDry && after.meter !== useGame.getState().shownMeter) {
     await meterUp(ctx, useGame.getState().shownMeter, after.meter, data().rules.goal);
   }
@@ -682,6 +686,19 @@ async function celebrateStars(ctx: Ctx, from: number, to: number, cheer: boolean
   faceCamera(coach);
   hero.expression = 'smile';
   g.set({ land: landOf(to, rules) });
+}
+
+/** A morning nobody recorded in the last dots: they come off gently and start over, then today's dot goes on. */
+async function lastDotsOver(ctx: Ctx, floor: number) {
+  const g = useGame.getState();
+  faceCamera(hero);
+  faceCamera(coach);
+  for (let m = g.shownMeter; m > floor; m--) {
+    g.set({ shownMeter: m - 1 });
+    await ctx.wait(0.18);
+  }
+  sfx.play('sparkle');
+  await say(ctx, floor > 0 ? 'meter-missed' : 'meter-missed-all', 0.2);
 }
 
 async function meterUp(ctx: Ctx, from: number, to: number, goal: number) {

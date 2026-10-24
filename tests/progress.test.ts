@@ -36,6 +36,7 @@ import {
   DEFAULT_PRIZES,
 } from '../src/game/rewards';
 import { rainbowDay, seasonFor } from '../src/board/Weather';
+import { lastDotsName, lastDotsSentence, skippedWords } from '../src/ui/meterWords';
 
 const NOW = new Date(2026, 9, 13, 8, 0, 0); // Oct 13 2026, local morning
 const TODAY = '2026-10-13';
@@ -199,7 +200,55 @@ describe('quest', () => {
     expect(normalizeSave({ ...raw, rules: { ...raw.rules, finalRun: 0 } }, NOW)!.rules.finalRun).toBe(0);
   });
 
-  it('treats unrecorded mornings as unknown: they neither add nor reset', () => {
+  it('needs the last five on mornings in a row: a skipped morning there starts those five over', () => {
+    const rules = { ...DEFAULT_RULES, goal: 10 };
+    // seven dry nights reach two dots into the last five
+    const r: Records = dryRun('2026-09-07', 7);
+    // nobody recorded Sep 8; a dry Sep 9 starts the last five over, as their first dot
+    const gap: Records = { ...r, '2026-09-09': 'dry' };
+    let q = computeQuest(gap, rules);
+    expect(q.meter).toBe(6);
+    expect(q.stars).toBe(8);
+    expect(q.missedRestart).toEqual({ on: '2026-09-09', after: '2026-09-07' });
+    // filling the skipped morning in as dry puts the dots back
+    q = computeQuest({ ...gap, '2026-09-08': 'dry' }, rules);
+    expect(q.meter).toBe(9);
+    expect(q.missedRestart).toBeNull();
+    // the meter fills only after five dry nights on five mornings in a row (Sep 9 to 13)
+    expect(computeQuest({ ...gap, ...dryRun('2026-09-12', 3) }, rules).goalReachedOn).toBeNull();
+    expect(computeQuest({ ...gap, ...dryRun('2026-09-13', 4) }, rules).goalReachedOn).toBe('2026-09-13');
+    // below the last five, or right at their start, a skipped morning changes nothing
+    expect(computeQuest({ ...dryRun('2026-09-03', 3), ...dryRun('2026-09-06', 2) }, rules).meter).toBe(5);
+    expect(computeQuest({ ...dryRun('2026-09-05', 5), '2026-09-07': 'dry' }, rules).meter).toBe(6);
+    // every dot needs mornings in a row when the goal is five or less
+    expect(computeQuest({ ...dryRun('2026-09-02', 2), '2026-09-04': 'dry' }, { ...DEFAULT_RULES, goal: 3 }).meter).toBe(1);
+    // with the rule off, and in the classic mode, skipped mornings are ignored as before
+    expect(computeQuest(gap, { ...rules, finalRun: 0 }).meter).toBe(8);
+    expect(computeQuest(gap, { ...rules, meter: 'streak' }).meter).toBe(8);
+  });
+
+  it('counts skipped mornings only from when the last-five rule began, so nothing recorded before changes', () => {
+    // recorded before the rule: 17 dry nights, two mornings nobody recorded, two more dry
+    const r: Records = { ...dryRun('2026-10-05', 17), ...dryRun('2026-10-09', 2) };
+    const d = normalizeSave({ app: APP_ID, version: 1, records: r, rules: { goal: 20, meter: 'kind', kindFrom: null } }, NOW)!;
+    expect(d.rules.finalFrom).toBe('2026-10-10');
+    const q = computeQuest(d.records, d.rules);
+    expect(q.meter).toBe(19);
+    expect(q.missedRestart).toBeNull();
+    // from then on a skipped morning in the last five starts them over
+    expect(computeQuest({ ...r, '2026-10-11': 'dry' }, d.rules).meter).toBe(16);
+    // ...but mornings skipped before the rule began never do
+    expect(computeQuest({ ...dryRun('2026-10-05', 17), '2026-10-10': 'dry' }, d.rules).meter).toBe(18);
+  });
+
+  it('names the skipped mornings for grown-ups', () => {
+    expect(skippedWords('2026-10-09', '2026-10-11').many).toBe(false);
+    expect(skippedWords('2026-10-05', '2026-10-10')).toMatchObject({ many: true, text: expect.stringMatching(/^the 4 mornings from .+ weren't recorded$/) });
+    expect(lastDotsSentence(DEFAULT_RULES)).toBe('The last five dots need five dry nights in a row, with no morning skipped.');
+    expect(lastDotsName({ ...DEFAULT_RULES, goal: 4 })).toBe('the meter');
+  });
+
+  it('treats unrecorded mornings below the last five as unknown: they neither add nor reset', () => {
     const r: Records = { ...dryRun('2026-10-05', 4), ...dryRun('2026-10-12', 3) };
     const q = computeQuest(r);
     expect(q.meter).toBe(7);

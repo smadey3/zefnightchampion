@@ -27,7 +27,7 @@ import {
   type NightResult,
   type QuestRules,
 } from '../state/progress';
-import { lastDotsSentence } from './meterWords';
+import { lastDotsName, lastDotsSentence, skippedWords } from './meterWords';
 import { exportBackup, parseBackup, type SaveData } from '../state/save';
 import { removeCurrentChild, resetBoardView, showTitle, startOver, startPreview } from '../game/director';
 import { childList, type CloudStatus } from '../state/store';
@@ -305,9 +305,18 @@ function consequence(data: SaveData, date: DateKey, result: NightResult | null):
             ? 'The underwear meter loses one dot'
             : `The underwear meter goes from ${from} to ${to} dots`;
     parts.push(`Coach Rex gives ${name} a big hug. ${meterNote}; all ${after.stars} stars stay.`);
-  } else if (after.meter !== before.meter) {
-    if (after.goalReachedOn && !before.goalReachedOn && !data.underpants.earned) parts.push('The underwear meter fills up — the Underwear Store opens!');
-    else parts.push(`The underwear meter becomes ${Math.min(after.meter, goal)} of ${goal}.`);
+  } else {
+    // a dry morning after a gap in the last dots starts them over
+    if (result === 'dry' && after.missedRestart?.on === date) {
+      const skipped = skippedWords(after.missedRestart.after, date);
+      parts.push(
+        `This starts ${lastDotsName(data.rules)} over, because ${skipped.text}. If you know ${skipped.many ? 'they were' : 'it was'} dry, record ${skipped.many ? 'those mornings' : 'that morning'} first.`,
+      );
+    }
+    if (after.meter !== before.meter) {
+      if (after.goalReachedOn && !before.goalReachedOn && !data.underpants.earned) parts.push('The underwear meter fills up — the Underwear Store opens!');
+      else parts.push(`The underwear meter becomes ${Math.min(after.meter, goal)} of ${goal}.`);
+    }
   }
   if (!parts.length) parts.push('Nothing on the board changes.');
   return parts.join(' ');
@@ -468,6 +477,12 @@ export function ParentPanel() {
 
   const goal = data.rules.goal;
   const lastN = Math.min(FINAL_RUN, goal);
+  const lastDots = lastDotsName(data.rules);
+  // skipped mornings in the last dots: the next morning recorded would start them over
+  const skipRisk = missing.length > 0 && questIfRecorded(data.records, today, 'dry', data.rules).missedRestart?.on === today;
+  // a restart from a skipped morning that filling it in could still undo
+  const skipRestart = q.missedRestart && (!q.lastWet || q.lastWet < q.missedRestart.on) && q.meter < goal ? q.missedRestart : null;
+  const skipped = skipRestart ? skippedWords(skipRestart.after, skipRestart.on) : null;
   const recorded = rate.dry + rate.wet;
   const p = recorded ? rate.dry / recorded : 0;
   const nextPrize = prizeAt(data.prizes, q.prizes);
@@ -521,8 +536,21 @@ export function ParentPanel() {
             <h2>Missing mornings</h2>
             <p>
               No record for {missing.length <= 3 ? missing.map((k) => formatKeyShort(k)).join(', ') : `${missing.length} mornings`} between the last
-              record and today. A missing morning never counts as dry or not dry: it doesn't add a star and doesn't reset the underwear meter. Fill
-              them in below if you know.
+              record and today.{' '}
+              {skipRisk
+                ? `${lastDots === 'the meter' ? `Every dot of ${name}'s meter needs` : `${name}'s meter is in ${lastDots}, which need`} dry nights in a row, so if ${missing.length === 1 ? 'it stays' : 'they stay'} empty, the next morning recorded starts ${lastDots === 'the meter' ? 'the meter' : 'those dots'} over.`
+                : `A missing morning doesn't add a star or change the meter${lastDotsSentence(data.rules) ? `, except in ${lastDots}, which need dry nights in a row with no morning skipped` : ''}.`}{' '}
+              Fill {missing.length === 1 ? 'it' : 'them'} in below if you know.
+            </p>
+          </section>
+        )}
+
+        {skipRestart && skipped && (
+          <section className="card notice">
+            <h2>A skipped morning</h2>
+            <p>
+              {lastDots === 'the meter' ? `${name}'s meter` : `${name}'s ${lastDots.replace('the ', '')}`} started over on {formatKeyShort(skipRestart.on)}, because {skipped.text}. If
+              you know {skipped.many ? 'they were' : 'it was'} dry, fill {skipped.many ? 'them' : 'it'} in below and the dots come back.
             </p>
           </section>
         )}
@@ -612,7 +640,8 @@ export function ParentPanel() {
                 <span>
                   {lastN === goal ? `All ${lastN}` : `The last ${lastN}`} dots need dry nights in a row{' '}
                   <span className="muted">
-                    (a not-dry night there starts {lastN === goal ? 'the meter' : `those ${lastN}`} over, so the meter only fills after {lastN} dry nights in a row)
+                    (a not-dry night or a skipped morning there starts {lastN === goal ? 'the meter' : `those ${lastN}`} over, so the meter only fills after {lastN}{' '}
+                    dry nights in a row)
                   </span>
                 </span>
               </label>
