@@ -5,12 +5,15 @@
 import { useEffect, useRef } from 'react';
 import { useGame, useSave } from '../state/store';
 import { BigHeartIcon, BigSunIcon, ChestIcon, HangerIcon, StarIcon, UnderpantsIcon } from './icons';
+import { lastDotsSentence } from './meterWords';
 
 export const HOW_LEAD =
   'Dino Underwear Quest is a quick morning game for kids who are learning to stay dry at night. It turns every morning into a little celebration, so your child gets excited about wearing underwear to bed instead of diapers.';
 
 export function HowItWorksSteps() {
-  const kind = useSave((s) => s.data.rules.meter) !== 'streak';
+  const rules = useSave((s) => s.data.rules);
+  const kind = rules.meter !== 'streak';
+  const lastDots = lastDotsSentence(rules);
   return (
     <ol className="how-steps">
       <li>
@@ -72,7 +75,7 @@ export function HowItWorksSteps() {
         <p>
           <strong>The underwear meter</strong>{' '}
           {kind
-            ? "gets a dot for every dry night, and a not-dry night only takes one away, so a few accidents never undo all their hard work. When it's full,"
+            ? `gets a dot for every dry night, and a not-dry night only takes one away, so a few accidents never undo all their hard work.${lastDots ? ` ${lastDots}` : ''} When it's full,`
             : "fills up with dry nights in a row. When it's full,"}{' '}
           your child is ready to wear underwear at night, and picks out a pair for their dino too!
         </p>

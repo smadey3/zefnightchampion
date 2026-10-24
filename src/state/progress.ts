@@ -7,9 +7,11 @@
 // - Every dry morning is a star. Stars never go away: the board only ever
 //   moves forward.
 // - The underwear meter: every dry morning adds a dot. In the kinder mode (the
-//   default) a wet morning takes one dot away; in the classic mode it starts
-//   the meter over, so the meter counts dry mornings in a row. A morning with
-//   no record is unknown: it neither adds nor takes away.
+//   default) a wet morning takes one dot away, except in the meter's last five
+//   dots, which need dry mornings in a row: a wet morning there starts those
+//   five over. In the classic mode a wet morning starts the whole meter over,
+//   so it counts dry mornings in a row. A morning with no record is unknown:
+//   it neither adds nor takes away.
 // - Prizes come from total stars: an early one at `earlyPrize` stars, then at
 //   `firstPrize` stars, then one every `prizeEvery` stars after that (5, 10,
 //   25, 40, ... by default).
@@ -37,9 +39,31 @@ export interface QuestRules {
    * switching never makes the meter jump. Null: kinder from the start.
    */
   kindFrom: DateKey | null;
+  /** Kinder meter: the last this-many dots need dry nights in a row (a wet night there starts them over); 0 = off. */
+  finalRun: number;
+  /** The first morning the last-dots rule applies, for an adventure that began before it existed (null: from the start). */
+  finalFrom: DateKey | null;
 }
 
-export const DEFAULT_RULES: QuestRules = { goal: 20, earlyPrize: 5, firstPrize: 10, prizeEvery: 15, meter: 'kind', kindFrom: null };
+/** How many of the meter's last dots need dry nights in a row. */
+export const FINAL_RUN = 5;
+
+export const DEFAULT_RULES: QuestRules = {
+  goal: 20,
+  earlyPrize: 5,
+  firstPrize: 10,
+  prizeEvery: 15,
+  meter: 'kind',
+  kindFrom: null,
+  finalRun: FINAL_RUN,
+  finalFrom: null,
+};
+
+/** The meter's last stretch: how many dots need dry nights in a row, and the dot it starts after. */
+export function finalStretch(rules: QuestRules): { size: number; floor: number } {
+  const size = rules.meter === 'kind' ? Math.max(0, Math.min(rules.finalRun, rules.goal)) : 0;
+  return { size, floor: rules.goal - size };
+}
 
 /** A key for caches that depend on where the chests are. */
 export function scheduleKey(rules: QuestRules): string {
@@ -173,6 +197,7 @@ export function computeQuest(records: Records, rules: QuestRules = DEFAULT_RULES
   let run = 0;
   let best = 0;
   let meter = 0;
+  const { size: stretch, floor } = finalStretch(rules);
   let lastWet: DateKey | null = null;
   let goalReachedOn: DateKey | null = null;
   const keys = sortedKeys(records);
@@ -187,7 +212,9 @@ export function computeQuest(records: Records, rules: QuestRules = DEFAULT_RULES
       wets++;
       run = 0;
       const kind = rules.meter === 'kind' && (!rules.kindFrom || k >= rules.kindFrom);
-      meter = kind ? Math.max(0, meter - 1) : 0;
+      // in the last stretch a wet morning starts the stretch over
+      const restart = kind && stretch > 0 && meter > floor && (!rules.finalFrom || k >= rules.finalFrom);
+      meter = !kind ? 0 : restart ? floor : Math.max(0, meter - 1);
       lastWet = k;
     }
   }

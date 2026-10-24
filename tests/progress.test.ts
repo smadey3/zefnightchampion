@@ -139,7 +139,7 @@ describe('quest', () => {
     // from then on a wet morning takes only one dot off
     expect(computeQuest({ ...r, '2026-10-10': 'wet' }, old.rules).meter).toBe(2);
     // the same nights in an adventure that had the kinder meter from the start
-    expect(computeQuest(r, { ...DEFAULT_RULES, goal: 10 }).meter).toBe(10);
+    expect(computeQuest(r, { ...DEFAULT_RULES, goal: 10, finalRun: 0 }).meter).toBe(10);
     expect(normalizeSave({ ...old }, NOW)!.rules.kindFrom).toBe('2026-10-10');
     expect(defaultSave(NOW).rules.kindFrom).toBeNull();
   });
@@ -148,11 +148,55 @@ describe('quest', () => {
     // dry, dry, wet, over and over: two steps forward, one back
     const r: Records = {};
     for (let i = 0; i < 30; i++) r[addDays('2026-09-01', i)] = i % 3 === 2 ? 'wet' : 'dry';
-    expect(computeQuest(r, { ...DEFAULT_RULES, goal: 10 }).goalReachedOn).not.toBeNull();
+    expect(computeQuest(r, { ...DEFAULT_RULES, goal: 10, finalRun: 0 }).goalReachedOn).not.toBeNull();
+    // ...but never five in a row, so with the last-five rule it never quite fills
+    expect(computeQuest(r, { ...DEFAULT_RULES, goal: 10 }).goalReachedOn).toBeNull();
     // dry, wet, dry, wet: never gets anywhere
     const half: Records = {};
     for (let i = 0; i < 40; i++) half[addDays('2026-09-01', i)] = i % 2 ? 'wet' : 'dry';
-    expect(computeQuest(half, { ...DEFAULT_RULES, goal: 5 }).goalReachedOn).toBeNull();
+    expect(computeQuest(half, { ...DEFAULT_RULES, goal: 5, finalRun: 0 }).goalReachedOn).toBeNull();
+  });
+
+  it('needs the last five dots in a row: a not-dry night there starts those five over', () => {
+    const rules = { ...DEFAULT_RULES, goal: 10 };
+    // seven dry nights reach into the last five; a not-dry night goes back to 5, not 6
+    let r: Records = dryRun('2026-09-07', 7);
+    r = { ...r, '2026-09-08': 'wet' };
+    expect(computeQuest(r, rules).meter).toBe(5);
+    // at exactly 5 (not into the last five yet) a not-dry night takes just one dot
+    expect(computeQuest({ ...r, '2026-09-09': 'wet' }, rules).meter).toBe(4);
+    // five dry nights in a row then fill it
+    r = { ...r, ...dryRun('2026-09-13', 5) };
+    const q = computeQuest(r, rules);
+    expect(q.meter).toBe(10);
+    expect(q.goalReachedOn).toBe('2026-09-13');
+    // the classic meter is all in a row anyway; turned off, the kinder meter just loses one
+    expect(computeQuest({ ...dryRun('2026-09-07', 7), '2026-09-08': 'wet' }, { ...rules, finalRun: 0 }).meter).toBe(6);
+  });
+
+  it('asks for every dot in a row when the goal is five or less', () => {
+    const rules = { ...DEFAULT_RULES, goal: 3 };
+    expect(computeQuest({ ...dryRun('2026-09-02', 2), '2026-09-03': 'wet' }, rules).meter).toBe(0);
+    expect(computeQuest({ ...dryRun('2026-09-02', 2), '2026-09-03': 'wet', ...dryRun('2026-09-06', 3) }, rules).goalReachedOn).toBe('2026-09-06');
+  });
+
+  it('starts the last-five rule with the next morning for an adventure already under way, changing nothing recorded', () => {
+    // an adventure from before the rule: kinder meter, no last-five setting yet
+    const r: Records = { ...dryRun('2026-10-05', 12), '2026-10-06': 'wet', ...dryRun('2026-10-09', 3) };
+    const raw = { app: APP_ID, version: 1, records: r, rules: { goal: 15, meter: 'kind', kindFrom: null } };
+    const before = computeQuest(r, { ...DEFAULT_RULES, goal: 15, finalRun: 0 });
+    const d = normalizeSave(raw, NOW)!;
+    expect(d.rules.finalRun).toBe(5);
+    expect(d.rules.finalFrom).toBe('2026-10-10');
+    expect(d.records).toEqual(r);
+    // the wet night at 12 dots happened before the rule: it still only took one dot
+    expect(computeQuest(d.records, d.rules).meter).toBe(before.meter);
+    expect(before.meter).toBe(14);
+    // from now on, a not-dry night in the last five starts them over
+    expect(computeQuest({ ...r, '2026-10-10': 'wet' }, d.rules).meter).toBe(10);
+    // a new adventure has the rule from the start, and it can be turned off
+    expect(defaultSave(NOW).rules.finalRun).toBe(5);
+    expect(normalizeSave({ ...raw, rules: { ...raw.rules, finalRun: 0 } }, NOW)!.rules.finalRun).toBe(0);
   });
 
   it('treats unrecorded mornings as unknown: they neither add nor reset', () => {
@@ -257,7 +301,8 @@ describe('save data', () => {
     expect(d.underpants.on).toBe('2026-10-12');
     d = withRecord(d, TODAY, 'wet', NOW);
     expect(d.underpants.earned).toBe(true);
-    expect(computeQuest(d.records, d.rules).meter).toBe(19);
+    // (a not-dry night in the last five starts those five over)
+    expect(computeQuest(d.records, d.rules).meter).toBe(15);
   });
 
   it('earns underpants when a grown-up lowers the goal below the current run', () => {

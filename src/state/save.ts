@@ -210,6 +210,9 @@ export function normalizeSave(raw: unknown, now: Date = new Date()): SaveData | 
       meter: rulesRaw.meter === 'streak' ? 'streak' : 'kind',
       // an adventure from before the kinder meter gets it from its next morning on
       kindFrom: isValidDateKey(rulesRaw.kindFrom) ? rulesRaw.kindFrom : rulesRaw.meter === undefined ? morningAfterLatest(records) : null,
+      // the last dots in a row: an adventure from before this rule gets it from its next morning on
+      finalRun: rulesRaw.finalRun === 0 ? 0 : DEFAULT_RULES.finalRun,
+      finalFrom: isValidDateKey(rulesRaw.finalFrom) ? rulesRaw.finalFrom : rulesRaw.finalRun === undefined ? morningAfterLatest(records) : null,
     },
     prizes: cleanPrizes(r.prizes),
     prizesGiven: Array.isArray(r.prizesGiven)
@@ -317,7 +320,7 @@ export function seenFromRecords(data: SaveData): Seen {
 /** A fresh quest that keeps who the child is and how the game sounds. */
 export function newQuest(data: SaveData, now: Date = new Date()): SaveData {
   const fresh = defaultSave(now);
-  return { ...fresh, profile: { ...data.profile }, settings: data.settings, prizes: data.prizes, rules: { ...data.rules, kindFrom: null } };
+  return { ...fresh, profile: { ...data.profile }, settings: data.settings, prizes: data.prizes, rules: { ...data.rules, kindFrom: null, finalFrom: null } };
 }
 
 /**
@@ -327,7 +330,7 @@ export function newQuest(data: SaveData, now: Date = new Date()): SaveData {
  */
 export function startOver(data: SaveData, now: Date = new Date()): SaveData {
   const fresh = defaultSave(now);
-  return { ...fresh, profile: { ...fresh.profile, name: data.profile.name }, settings: data.settings, prizes: data.prizes, rules: { ...data.rules, kindFrom: null } };
+  return { ...fresh, profile: { ...fresh.profile, name: data.profile.name }, settings: data.settings, prizes: data.prizes, rules: { ...data.rules, kindFrom: null, finalFrom: null } };
 }
 
 export function exportBackup(data: SaveData, now: Date = new Date()): string {

@@ -35,7 +35,8 @@ import { ParentButton, ParentPanel } from './ParentArea';
 import { ArrowIcon, BigHeartIcon, ChestIcon, CheckIcon, HangerIcon, ReplayIcon, SoundOffIcon, SoundOnIcon, StarIcon, UnderpantsIcon, BigSunIcon } from './icons';
 import { accessoryThumb } from './thumbs';
 import { useOutfit } from '../board/Board';
-import { landRange, landOf } from '../state/progress';
+import { finalStretch, landRange, landOf } from '../state/progress';
+import { lastDotsSentence } from './meterWords';
 import { ACCESSORIES, DINO_COLORS, SPECIES } from '../game/rewards';
 import { setSoundOn } from '../audio/core';
 import { sfx } from '../audio/sfx';
@@ -115,12 +116,16 @@ function UnderwearMeter() {
   const meter = useGame((s) => s.shownMeter);
   const scene = useGame((s) => s.scene);
   const highlight = useGame((s) => s.highlight);
-  const goal = useSave((s) => s.data.rules.goal);
+  const rules = useSave((s) => s.data.rules);
+  const goal = rules.goal;
   const earned = useSave((s) => s.data.underpants.earned);
   const tappable = useGame((s) => s.awaiting === 'intro-meter');
   if (scene !== 'board') return null;
   const filled = Math.min(goal, meter);
   const dots = Array.from({ length: goal }, (_, i) => goal - 1 - i);
+  // the last dots that need dry nights in a row look different, with a little gap below them
+  const { size, floor } = finalStretch(rules);
+  const isFinal = (i: number) => size > 0 && floor > 0 && i >= floor;
   return (
     <div
       className={`meter${highlight === 'meter' ? ' glow' : ''}${earned ? ' earned' : ''}${tappable ? ' tappable' : ''}`}
@@ -133,7 +138,10 @@ function UnderwearMeter() {
       </div>
       <div className="meter-track" style={{ ['--n' as string]: goal }}>
         {dots.map((i) => (
-          <span key={i} className={`meter-dot${i < filled ? ' on' : ''}${i === filled - 1 ? ' newest' : ''}`} />
+          <span
+            key={i}
+            className={`meter-dot${i < filled ? ' on' : ''}${i === filled - 1 ? ' newest' : ''}${isFinal(i) ? ' final' : ''}${isFinal(i) && i === floor ? ' final-start' : ''}`}
+          />
         ))}
       </div>
       <div className="meter-count">
@@ -427,7 +435,8 @@ function SkipIntro() {
 function SetupName() {
   const name = useSave((s) => s.data.profile.name);
   const canGoBack = useGame((s) => s.setupBack);
-  const meterMode = useSave((s) => s.data.rules.meter);
+  const setupRules = useSave((s) => s.data.rules);
+  const meterMode = setupRules.meter;
   const [value, setValue] = useState(name);
   const ok = value.trim().length > 0;
   return (
@@ -449,7 +458,7 @@ function SetupName() {
         <GoalChips label="Dry nights to fill the meter" />
       </div>
       <p className="muted small">
-        {meterMode === 'streak' ? 'The meter fills with dry nights in a row.' : 'Each dry night adds a dot, and a not-dry night only takes one away.'} Tip:
+        {meterMode === 'streak' ? 'The meter fills with dry nights in a row.' : `Each dry night adds a dot, and a not-dry night only takes one away. ${lastDotsSentence(setupRules)}`.trim()} Tip:
         if dry nights are still rare, start small. A goal they can reach feels great, and you can change it any time behind the moon button.
       </p>
       <div className="row setup-actions">

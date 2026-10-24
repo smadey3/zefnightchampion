@@ -194,6 +194,7 @@ export const LINES: Record<string, Line> = {
   'meter-3': { text: "Only three more dry nights, and you're ready for underwear at night!" },
   'meter-2': { text: 'Just two more dry nights to go!' },
   'meter-1': { text: 'Just one more dry night! You can do it!' },
+  'meter-final': { text: 'Whoa! You made it to the last five dots! Stay dry five nights in a row, and your meter is all the way full!' },
 
   // ---------------------------------------------------------- chests
   'chest-reach': { text: "You made it to the treasure chest! Tap it and see what's inside!" },
@@ -232,6 +233,7 @@ export const LINES: Record<string, Line> = {
   'wet-2': { text: 'Come here! Big dino hug! My arms are tiny, but my hugs are huge!' },
   'wet-3': { text: "And look! You still have all your stars! Tonight's a brand new try!" },
   'wet-3-kind': { text: "And look! You still have all your stars, and your meter only lost one dot! Tonight's a brand new try!" },
+  'wet-3-final': { text: "And look! You still have all your stars, and your meter is still way up high! The last five dots just start over. Tonight's a brand new try!" },
   'wet-4': { text: "No worries, buddy. Every dino has nights like that. You're still my favorite dino!" },
   'wet-5': { text: "Oops! That's okay. Bodies need lots of practice, and you're doing great!" },
 

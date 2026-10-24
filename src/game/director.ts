@@ -22,7 +22,7 @@ import { music } from '../audio/music';
 import { unlockAudio, voiceLevel } from '../audio/core';
 import { burst } from '../three/Particles';
 import { useGame, useSave, type PreviewKind } from '../state/store';
-import { computeQuest, landOf, landRange, prizesEarned, todayKey, type DateKey, type QuestState } from '../state/progress';
+import { computeQuest, finalStretch, landOf, landRange, prizesEarned, todayKey, type DateKey, type QuestState } from '../state/progress';
 import { ACCESSORIES, accessoriesUnlocked, accessoryForStar, prizeAt, resolveOutfit, surpriseFor, type Prize, type Species } from './rewards';
 import { chestPos, groundHeight, landCurve, restPos, spacePos, storeLandmarkPos } from '../board/layout';
 import { chestAnim, onChestTap } from '../board/Chest';
@@ -594,7 +594,7 @@ async function playPending(ctx: Ctx) {
   const q = computeQuest(d.records, d.rules);
   const g = useGame.getState();
   const latestDry = q.latest?.result === 'dry';
-  prefetch([dryCheer(q.stars), 'first-star', 'wet-1', 'wet-4', 'wet-5', 'wet-2', 'wet-3', 'wet-3-kind', ...todaysExtra(), GOODBYES[dayIndex() % GOODBYES.length]]);
+  prefetch([dryCheer(q.stars), 'first-star', 'wet-1', 'wet-4', 'wet-5', 'wet-2', 'wet-3', 'wet-3-kind', 'wet-3-final', ...todaysExtra(), GOODBYES[dayIndex() % GOODBYES.length]]);
 
   // 1. a chest the child is already past but hasn't opened (the prize schedule
   //    gained one): open the one just behind them, and settle older ones quietly
@@ -697,7 +697,10 @@ async function meterUp(ctx: Ctx, from: number, to: number, goal: number) {
   }
   const left = goal - to;
   if (to >= goal) return;
-  if (left >= 1 && left <= 3) await say(ctx, `meter-${left}`);
+  // reaching the last five dots: from here they need dry nights in a row
+  const stretch = finalStretch(data().rules);
+  if (stretch.size > 0 && stretch.floor > 0 && from < stretch.floor && to === stretch.floor) await say(ctx, 'meter-final');
+  else if (left >= 1 && left <= 3) await say(ctx, `meter-${left}`);
   else if (to === Math.floor(goal / 2)) await say(ctx, 'meter-half');
   else if (to === 1 || to % 5 === 0) await say(ctx, 'meter-up');
 }
@@ -1793,7 +1796,9 @@ async function hug(ctx: Ctx, preview: boolean, replay = false) {
     const kind = data().rules.meter !== 'streak';
     // watching it again starts the meter where it was before the not-dry night
     const from = replay ? meterBefore(today()) : g.shownMeter;
-    const to = preview && !replay ? (kind ? Math.max(0, from - 1) : 0) : Math.min(from, quest().meter);
+    const stretch = finalStretch(data().rules);
+    const restart = kind && stretch.size > 0 && from > stretch.floor;
+    const to = preview && !replay ? (kind ? (restart ? stretch.floor : Math.max(0, from - 1)) : 0) : Math.min(from, quest().meter);
     g.set({ shownMeter: from });
     for (let m = from; m > to; m--) {
       g.set({ shownMeter: m - 1 });
@@ -1802,8 +1807,10 @@ async function hug(ctx: Ctx, preview: boolean, replay = false) {
     g.set({ shownMeter: to });
     sfx.play('sparkle');
     boardCamera(1.4);
-    // ("only lost one dot" only when that's true: a dry morning a grown-up changed to not dry takes off two)
-    await say(ctx, kind && from - to === 1 ? 'wet-3-kind' : 'wet-3', 0.2);
+    // ("only lost one dot" only when that's true: a dry morning a grown-up changed to not dry takes off two,
+    // and in the last five dots the five start over)
+    const startedOver = restart && to === stretch.floor && from - to > 1;
+    await say(ctx, startedOver ? 'wet-3-final' : kind && from - to === 1 ? 'wet-3-kind' : 'wet-3', 0.2);
   } finally {
     clearInterval(hearts);
   }

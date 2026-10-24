@@ -24,7 +24,7 @@ import {
   type CloudDoc,
   type Library,
 } from './library';
-import { computeQuest, type DateKey, type MeterMode, type NightResult, type QuestState } from './progress';
+import { FINAL_RUN, computeQuest, type DateKey, type MeterMode, type NightResult, type QuestState } from './progress';
 import type { Prize, Slot } from '../game/rewards';
 
 /**
@@ -53,6 +53,7 @@ interface SaveStore {
   setGoal: (goal: number) => void;
   /** what a not-dry night does to the meter */
   setMeterMode: (mode: MeterMode) => void;
+  setFinalRun: (on: boolean) => void;
   setPrizes: (prizes: Prize[]) => void;
   setPrizeGiven: (i: number, given: boolean) => void;
   setOutfit: (slot: Slot, accessory: number) => void;
@@ -133,6 +134,10 @@ export const useSave = create<SaveStore>((set, get) => {
     setMeterMode(mode) {
       const d = get().data;
       put(applyDerived({ ...d, rules: { ...d.rules, meter: mode } }));
+    },
+    setFinalRun(on) {
+      const d = get().data;
+      put(applyDerived({ ...d, rules: { ...d.rules, finalRun: on ? FINAL_RUN : 0 } }));
     },
     setPrizes(prizes) {
       put({ ...get().data, prizes });

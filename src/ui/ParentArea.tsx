@@ -8,11 +8,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useGame, useSave } from '../state/store';
 import {
+  FINAL_RUN,
   GOAL_MAX,
   GOAL_MIN,
   addDays,
   computeQuest,
   daysBetween,
+  finalStretch,
   formatKeyLong,
   formatKeyShort,
   missingSinceLatest,
@@ -22,9 +24,10 @@ import {
   sortedKeys,
   todayKey,
   type DateKey,
-  type MeterMode,
   type NightResult,
+  type QuestRules,
 } from '../state/progress';
+import { lastDotsSentence } from './meterWords';
 import { exportBackup, parseBackup, type SaveData } from '../state/save';
 import { removeCurrentChild, resetBoardView, showTitle, startOver, startPreview } from '../game/director';
 import { childList, type CloudStatus } from '../state/store';
@@ -311,22 +314,25 @@ function consequence(data: SaveData, date: DateKey, result: NightResult | null):
 }
 
 /**
- * Average mornings to fill a meter of `n`, at dry rate `p`: `n` dry nights in
+ * Average mornings to fill the meter at dry rate `p`: the goal's dry nights in
  * a row (classic), or, for the kinder meter, a dot up for each dry night and
- * one down for each wet one (never below zero).
+ * one down for each wet one (never below zero), then the last dots in a row.
  */
-function expectedWait(p: number, n: number, mode: MeterMode): number {
-  if (p >= 0.999) return n;
+function expectedWait(p: number, rules: QuestRules): number {
+  if (p >= 0.999) return rules.goal;
   if (p <= 0.01) return Infinity;
-  if (mode === 'streak') return (1 / Math.pow(p, n) - 1) / (1 - p);
+  const inARow = (k: number) => (1 / Math.pow(p, k) - 1) / (1 - p);
+  if (rules.meter === 'streak') return inARow(rules.goal);
   // mornings to climb from k to k+1: from 0 a wet night stays at 0
-  let step = 1 / p;
-  let total = step;
-  for (let k = 1; k < n; k++) {
-    step = (1 + (1 - p) * step) / p;
+  const { size, floor } = finalStretch(rules);
+  let step = 0;
+  let total = 0;
+  for (let k = 0; k < floor; k++) {
+    step = k === 0 ? 1 / p : (1 + (1 - p) * step) / p;
     total += step;
   }
-  return total;
+  // the last dots in a row (roughly: a wet night there starts them over)
+  return total + (size > 0 ? inARow(size) : 0);
 }
 
 function friendlyDuration(days: number): string {
@@ -461,6 +467,7 @@ export function ParentPanel() {
   };
 
   const goal = data.rules.goal;
+  const lastN = Math.min(FINAL_RUN, goal);
   const recorded = rate.dry + rate.wet;
   const p = recorded ? rate.dry / recorded : 0;
   const nextPrize = prizeAt(data.prizes, q.prizes);
@@ -557,7 +564,7 @@ export function ParentPanel() {
           <p className="muted small">
             {data.rules.meter === 'streak'
               ? 'The meter counts dry mornings since the last not-dry one. Stars never go away.'
-              : 'A dry morning adds a dot to the meter and a not-dry one takes a dot away. Stars never go away.'}
+              : `A dry morning adds a dot to the meter and a not-dry one takes a dot away. ${lastDotsSentence(data.rules)} Stars never go away.`.replace('  ', ' ')}
           </p>
         </section>
 
@@ -585,7 +592,7 @@ export function ParentPanel() {
             <p className="note">
               Lately {name} has been dry {rate.dry} of {recorded} recorded nights. At that rate,{' '}
               {data.rules.meter === 'streak' ? `${goal} in a row takes` : `filling all ${goal} dots takes`}{' '}
-              {friendlyDuration(expectedWait(p, goal, data.rules.meter))} on average
+              {friendlyDuration(expectedWait(p, data.rules))} on average
               {p < 0.85 && goal > 10 ? ' — a smaller goal might feel more reachable for now; you can raise it later' : ''}.
             </p>
           ) : (
@@ -599,12 +606,28 @@ export function ParentPanel() {
                 Take one dot off the meter <span className="muted">(kinder: a few accidents don't undo all the hard work)</span>
               </span>
             </label>
+            {data.rules.meter !== 'streak' && (
+              <label className="final-run">
+                <input type="checkbox" checked={data.rules.finalRun > 0} onChange={(e) => useSave.getState().setFinalRun(e.target.checked)} />
+                <span>
+                  {lastN === goal ? `All ${lastN}` : `The last ${lastN}`} dots need dry nights in a row{' '}
+                  <span className="muted">
+                    (a not-dry night there starts {lastN === goal ? 'the meter' : `those ${lastN}`} over, so the meter only fills after {lastN} dry nights in a row)
+                  </span>
+                </span>
+              </label>
+            )}
             <label>
               <input type="radio" name="meter-mode" checked={data.rules.meter === 'streak'} onChange={() => useSave.getState().setMeterMode('streak')} />
               <span>
                 Start the meter over <span className="muted">(the classic way: dry nights in a row)</span>
               </span>
             </label>
+            {data.rules.meter !== 'streak' && data.rules.finalRun > 0 && data.rules.finalFrom && sortedKeys(data.records)[0] < data.rules.finalFrom && (
+              <p className="muted small">
+                The last-{lastN} rule counts from {formatKeyShort(data.rules.finalFrom)} on, so nothing {name} had already recorded changed.
+              </p>
+            )}
             {data.rules.meter !== 'streak' && data.rules.kindFrom && sortedKeys(data.records)[0] < data.rules.kindFrom && (
               <p className="muted small">
                 {name}'s adventure began before the kinder meter, so it counts this way from {formatKeyShort(data.rules.kindFrom)} on. Earlier nights stay as they

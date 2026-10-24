@@ -101,8 +101,10 @@ buttons are showing.
   them can be edited.
 - **The underwear meter.** This has underwear at the top. Every dry night
   adds a dot, and a not-dry night takes only one away (never below empty),
-  so a few accidents never undo weeks of work; the meter fills once dry
-  nights clearly outnumber the rest. When it's full (20 dots by default; a
+  so a few accidents never undo weeks of work. The last five dots (shown in
+  gold) are different: they need five dry nights in a row, and a not-dry
+  night there starts those five over, so the meter only fills after five
+  dry nights in a row. Coach Rex says so when the child reaches them. When it's full (20 dots by default; a
   grown-up can change the goal), Zef is ready to wear underwear at night. A
   pterodactyl flies him to the Underwear Store, where he picks out
   underwear for his dino, so they both wear underwear at night. Coach Rex
@@ -149,7 +151,10 @@ multiplication question. In the parent corner you can:
 - set the underwear goal; it shows how long the goal typically takes at
   the recent dry rate
 - choose what a not-dry night does to the meter: take one dot off (the
-  kinder default) or start it over (the classic way: dry nights in a row)
+  kinder default, with the last five dots needing dry nights in a row,
+  which can be turned off) or start it over (the classic way: dry nights in
+  a row). An adventure already under way when the last-five rule arrived
+  gets it from its next morning on, so nothing already recorded changes
 - edit the prizes and tick off the ones you've handed over
 - preview a dry morning, the hug, a prize chest, a surprise (a different
   one each tap), the Underwear Store or the intro, without changing real
